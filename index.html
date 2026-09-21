@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Трекер привычек</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --card2: #22262f;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #6c5ce7;
+    --accent2: #00d2a0;
+    --danger: #ff6b6b;
+    --gold: #ffc107;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+    background-image: radial-gradient(circle at 20% 0%, rgba(108,92,231,.15), transparent 40%),
+                      radial-gradient(circle at 80% 100%, rgba(0,210,160,.1), transparent 40%);
+  }
+
+  .container { max-width: 720px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 28px; }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6c5ce7, #00d2a0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .subtitle { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+  /* Мотивационная фраза */
+  .motivation {
+    background: linear-gradient(135deg, rgba(108,92,231,.25), rgba(0,210,160,.15));
+    border: 1px solid rgba(108,92,231,.4);
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    text-align: center;
+    animation: fadeIn .5s ease;
+  }
+
+  .motivation .quote {
+    font-size: 17px;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  .motivation .emoji { font-size: 24px; display: block; margin-bottom: 6px; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Форма добавления */
+  .add-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .add-form input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid #2c3140;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border .2s;
+  }
+
+  .add-form input:focus { border-color: var(--accent); }
+
+  .add-form button {
+    background: linear-gradient(135deg, #6c5ce7, #8e7cff);
+    border: none;
+    border-radius: 12px;
+    padding: 0 22px;
+    color: white;
+    font-size: 22px;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .2s;
+    box-shadow: 0 4px 14px rgba(108,92,231,.4);
+  }
+
+  .add-form button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(108,92,231,.55); }
+  .add-form button:active { transform: scale(.96); }
+
+  /* Карточка привычки */
+  .habit {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 14px;
+    border: 1px solid #242833;
+    animation: fadeIn .3s ease;
+    transition: border-color .3s;
+  }
+
+  .habit.done-today { border-color: rgba(0,210,160,.5); }
+
+  .habit-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .habit-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+  .check-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid #3a4050;
+    background: transparent;
+    color: transparent;
+    font-size: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all .25s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .check-btn:hover { border-color: var(--accent2); transform: scale(1.08); }
+
+  .check-btn.checked {
+    background: linear-gradient(135deg, #00d2a0, #00b088);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 0 16px rgba(0,210,160,.5);
+  }
+
+  .habit-name {
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .habit-streak-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .delete-btn {
+    background: transparent;
+    border: none;
+    color: #4a5060;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: color .2s, background .2s;
+    flex-shrink: 0;
+  }
+
+  .delete-btn:hover { color: var(--danger); background: rgba(255,107,107,.1); }
+
+  /* Streak-полоска */
+  .streak-bar {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .day-cell {
+    flex: 1;
+    height: 34px;
+    border-radius: 8px;
+    background: var(--card2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--muted);
+    transition: all .3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .day-cell .day-num { font-size: 11px; font-weight: 600; }
+
+  .day-cell.done {
+    background: linear-gradient(135deg, #00d2a0, #00b088);
+    color: #06251c;
+    font-weight: 700;
+  }
+
+  .day-cell.today {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .day-cell.future { opacity: .35; }
+
+  /* Сводка streak */
+  .streak-summary {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .streak-summary b { color: var(--gold); font-size: 15px; }
+
+  /* Пустое состояние */
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 50px 20px;
+    font-size: 15px;
+  }
+
+  .empty .big { font-size: 48px; display: block; margin-bottom: 12px; }
+
+  /* Тост */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--card);
+    border: 1px solid rgba(0,210,160,.5);
+    color: var(--text);
+    padding: 14px 22px;
+    border-radius: 14px;
+    font-size: 14px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
+    transition: transform .35s cubic-bezier(.2,.9,.3,1.3);
+    z-index: 100;
+    max-width: 90vw;
+    text-align: center;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>⚡ Трекер привычек</h1>
+    <p class="subtitle">Маленькие шаги каждый день</p>
+  </header>
+
+  <div class="motivation" id="motivation">
+    <span class="emoji">🔥</span>
+    <div class="quote" id="quoteText">Начни сегодня — и завтра скажешь себе спасибо.</div>
+  </div>
+
+  <div class="add-form">
+    <input type="text" id="habitInput" placeholder="Новая привычка..." maxlength="40">
+    <button id="addBtn" title="Добавить">+</button>
+  </div>
+
+  <div id="habitsList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== ДАННЫЕ ===================== */
+const STORAGE_KEY = 'habit-tracker-v1';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const BAR_LENGTH = 7; // сколько дней показывать в полоске
+
+let habits = load();
+
+/* ===================== МОТИВАЦИОННЫЕ ФРАЗЫ ===================== */
+const QUOTES = [
+  { emoji: '🔥', text: 'Начни сегодня — и завтра скажешь себе спасибо.' },
+  { emoji: '🌱', text: 'Успех — это сумма маленьких усилий, повторяемых изо дня в день.' },
+  { emoji: '💪', text: 'Дисциплина — это выбор между тем, что хочешь сейчас, и тем, что хочешь больше всего.' },
+  { emoji: '🚀', text: 'Не останавливайся, когда тяжело. Остановись, когда done.' },
+  { emoji: '⭐', text: 'Ты на один день ближе к своей цели. Не сдавайся!' },
+  { emoji: '🧠', text: 'Привычка — это не цель, это образ жизни.' },
+  { emoji: '🌊', text: 'Капля камень точит не силой, а постоянством.' },
+  { emoji: '🏆', text: 'Чемпионы тренируются, когда никто не смотрит.' },
+  { emoji: '⏳', text: 'Лучшее время посадить дерево было 20 лет назад. Второе лучшее — сейчас.' },
+  { emoji: '🎯', text: 'Фокус — это сила сказать «нет» сотне хороших идей.' },
+  { emoji: '🌅', text: 'Каждое утро — это новый шанс стать лучше.' },
+  { emoji: '💎', text: 'Трудности — это ступени, а не преграды.' }
+];
+
+/* ===================== УТИЛИТЫ ===================== */
+// Возвращает дату в формате YYYY-MM-DD по локальному времени
+function dateKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function todayKey() { return dateKey(); }
+
+// Смещение по дням от сегодня (0 = сегодня, -1 = вчера и т.д.)
+function shiftKey(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return dateKey(d);
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return seed();
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : seed();
+  } catch (e) {
+    return seed();
+  }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+}
+
+// Начальные привычки для демонстрации
+function seed() {
+  const demo = [
+    { id: uid(), name: 'Зарядка утром 🏃', completed: [shiftKey(-3), shiftKey(-2), shiftKey(-1)] },
+    { id: uid(), name: 'Пить воду 💧', completed: [shiftKey(-5), shiftKey(-4), shiftKey(-3), shiftKey(-2), shiftKey(-1)] },
+    { id: uid(), name: 'Читать 20 минут 📚', completed: [shiftKey(-2), shiftKey(-1)] },
+    
+  ];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(demo));
+  return demo;
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/* ===================== ЛОГИКА STREAK ===================== */
+// Текущая серия: считаем подряд идущие дни, начиная с сегодня (или вчера, если сегодня ещё не отмечено)
+function currentStreak(habit) {
+  const set = new Set(habit.completed);
+  let streak = 0;
+  // Если сегодня не отмечено — начинаем со вчера
+  let startOffset = set.has(todayKey()) ? 0 : -1;
+  for (let i = startOffset; ; i--) {
+    if (set.has(shiftKey(i))) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// Лучшая серия за всю историю
+function bestStreak(habit) {
+  if (!habit.completed.length) return 0;
+  const sorted = [...new Set(habit.completed)].sort();
+  let best = 1, cur = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(sorted[i - 1] + 'T00:00:00');
+    const now  = new Date(sorted[i] + 'T00:00:00');
+    const diff = Math.round((now - prev) / DAY_MS);
+    if (diff === 1) { cur++; best = Math.max(best, cur); }
+    else cur = 1;
+  }
+  return best;
+}
+
+/* ===================== РЕНДЕР ===================== */
+function render() {
+  const list = document.getElementById('habitsList');
+  list.innerHTML = '';
+
+  if (!habits.length) {
+    list.innerHTML = `<div class="empty"><span class="big">🌱</span>Пока нет привычек.<br>Добавь первую и начни свой путь!</div>`;
+    return;
+  }
+
+  habits.forEach(h => list.appendChild(renderHabit(h)));
+}
+
+function renderHabit(habit) {
+  const el = document.createElement('div');
+  const doneToday = habit.completed.includes(todayKey());
+  el.className = 'habit' + (doneToday ? ' done-today' : '');
+
+  const streak = currentStreak(habit);
+  const best = bestStreak(habit);
+  const total = new Set(habit.completed).size;
+
+  // Streak-полоска: последние BAR_LENGTH дней (от старого к новому)
+  const cells = [];
+  for (let i = BAR_LENGTH - 1; i >= 0; i--) {
+    const key = shiftKey(-i);
+    const isDone = habit.completed.includes(key);
+    const isToday = i === 0;
+    const isFuture = false; // все дни в прошлом/сегодня
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dayNum = d.getDate();
+
+    cells.push(`
+      <div class="day-cell ${isDone ? 'done' : ''} ${isToday ? 'today' : ''}" title="${key}">
+        <span class="day-num">${dayNum}</span>
+        <span>${isDone ? '✓' : ''}</span>
+      </div>
+    `);
+  }
+
+  el.innerHTML = `
+    <div class="habit-top">
+      <div class="habit-info">
+        <button class="check-btn ${doneToday ? 'checked' : ''}" data-action="toggle">✓</button>
+        <div style="min-width:0">
+          <div class="habit-name">${escapeHtml(habit.name)}</div>
+          <div class="habit-streak-label">
+            ${streak > 0 ? `🔥 Серия: ${streak} ${pluralDays(streak)}` : 'Начни серию сегодня!'}
+          </div>
+        </div>
+      </div>
+      <button class="delete-btn" data-action="delete" title="Удалить">🗑</button>
+    </div>
+
+    <div class="streak-bar">${cells.join('')}</div>
+
+    <div class="streak-summary">
+      <span>🔥 Текущая: <b>${streak}</b></span>
+      <span>🏆 Лучшая: <b>${best}</b></span>
+      <span>📅 Всего: <b>${total}</b></span>
+    </div>
+  `;
+
+  el.querySelector('[data-action="toggle"]').addEventListener('click', () => toggleHabit(habit.id));
+  el.querySelector('[data-action="delete"]').addEventListener('click', () => deleteHabit(habit.id));
+
+  return el;
+}
+
+function pluralDays(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'день';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'дня';
+  return 'дней';
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* ===================== ДЕЙСТВИЯ ===================== */
+function addHabit() {
+  const input = document.getElementById('habitInput');
+  const name = input.value.trim();
+  if (!name) return;
+  habits.push({ id: uid(), name, completed: [] });
+  input.value = '';
+  save();
+  render();
+  showMotivation();
+  toast('Привычка добавлена! Погнали 🚀');
+}
+
+function toggleHabit(id) {
+  const habit = habits.find(h => h.id === id);
+  if (!habit) return;
+  const key = todayKey();
+  const idx = habit.completed.indexOf(key);
+
+  if (idx === -1) {
+    habit.completed.push(key);
+    const streak = currentStreak(habit);
+    save();
+    render();
+    // Поздравление за серию
+    if (streak > 0 && streak % 7 === 0) {
+      toast(`🏆 ${streak} дней подряд! Ты легенда!`);
+    } else if (streak === 1) {
+      toast('✅ Отлично! Начало положено');
+    } else {
+      toast(`🔥 Серия: ${streak} ${pluralDays(streak)}`);
+    }
+    showMotivation();
+  } else {
+    habit.completed.splice(idx, 1);
+    save();
+    render();
+    toast('Отметка снята');
+  }
+}
+
+function deleteHabit(id) {
+  const habit = habits.find(h => h.id === id);
+  if (!habit) return;
+  if (!confirm(`Удалить «${habit.name}»?`)) return;
+  habits = habits.filter(h => h.id !== id);
+  save();
+  render();
+  toast('Привычка удалена');
+}
+
+/* ===================== МОТИВАЦИЯ ===================== */
+function showMotivation() {
+  const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  const box = document.getElementById('motivation');
+  box.querySelector('.emoji').textContent = q.emoji;
+  document.getElementById('quoteText').textContent = q.text;
+  // перезапуск анимации
+  box.style.animation = 'none';
+  void box.offsetWidth;
+  box.style.animation = 'fadeIn .5s ease';
+}
+
+/* ===================== ТОСТ ===================== */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ===================== ИНИЦИАЛИЗАЦИЯ ===================== */
+document.getElementById('addBtn').addEventListener('click', addHabit);
+document.getElementById('habitInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addHabit();
+});
+
+// Автосброс «сегодня» при смене даты (если вкладка открыта долго)
+let lastDay = todayKey();
+setInterval(() => {
+  const now = todayKey();
+  if (now !== lastDay) {
+    lastDay = now;
+    render();
+    toast('🌅 Новый день — новые возможности!');
+  }
+}, 60000);
+
+// Первичный рендер
+render();
+showMotivation();
+</script>
+</body>
+</html>
