@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -210,6 +211,8 @@
   }
 
   .day-cell.future { opacity: .35; }
+  .day-cell:hover { filter: brightness(1.2); }
+  .day-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Сводка streak */
   .streak-summary {
@@ -413,10 +416,11 @@ function renderHabit(habit) {
     const dayNum = d.getDate();
 
     cells.push(`
-      <div class="day-cell ${isDone ? 'done' : ''} ${isToday ? 'today' : ''}" title="${key}">
+      <button type="button" class="day-cell ${isDone ? 'done' : ''} ${isToday ? 'today' : ''}"
+              data-date="${key}" title="Отметить ${key}" aria-pressed="${isDone}">
         <span class="day-num">${dayNum}</span>
         <span>${isDone ? '✓' : ''}</span>
-      </div>
+      </button>
     `);
   }
 
@@ -444,6 +448,9 @@ function renderHabit(habit) {
   `;
 
   el.querySelector('[data-action="toggle"]').addEventListener('click', () => toggleHabit(habit.id));
+  el.querySelectorAll('.day-cell').forEach(cell => {
+    cell.addEventListener('click', () => toggleHabit(habit.id, cell.dataset.date));
+  });
   el.querySelector('[data-action="delete"]').addEventListener('click', () => deleteHabit(habit.id));
 
   return el;
@@ -473,32 +480,21 @@ function addHabit() {
   toast('Привычка добавлена! Погнали 🚀');
 }
 
-function toggleHabit(id) {
+function toggleHabit(id, key = todayKey()) {
   const habit = habits.find(h => h.id === id);
   if (!habit) return;
-  const key = todayKey();
-  const idx = habit.completed.indexOf(key);
 
+  const idx = habit.completed.indexOf(key);
   if (idx === -1) {
     habit.completed.push(key);
-    const streak = currentStreak(habit);
-    save();
-    render();
-    // Поздравление за серию
-    if (streak > 0 && streak % 7 === 0) {
-      toast(`🏆 ${streak} дней подряд! Ты легенда!`);
-    } else if (streak === 1) {
-      toast('✅ Отлично! Начало положено');
-    } else {
-      toast(`🔥 Серия: ${streak} ${pluralDays(streak)}`);
-    }
-    showMotivation();
+    toast(key === todayKey() ? 'Отмечено за сегодня!' : `Отмечено: ${key}`);
   } else {
     habit.completed.splice(idx, 1);
-    save();
-    render();
     toast('Отметка снята');
   }
+
+  save();
+  render();
 }
 
 function deleteHabit(id) {
