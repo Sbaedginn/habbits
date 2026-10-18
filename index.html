@@ -255,6 +255,53 @@
   }
 
   .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Календарь привычек */
+  .calendar-panel {
+    background: var(--card);
+    border: 1px solid #242833;
+    border-radius: 16px;
+    padding: 16px;
+    margin: 0 0 24px;
+  }
+  .calendar-heading {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .calendar-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .calendar-controls button, .calendar-controls select {
+    background: var(--card2); color: var(--text); border: 1px solid #343a49;
+    border-radius: 9px; padding: 8px 10px; cursor: pointer; font: inherit;
+  }
+  .calendar-title { font-weight: 700; text-align: center; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .calendar-weekday {
+    color: var(--muted); text-align: center; font-size: 11px; padding: 5px 0;
+  }
+  .calendar-day {
+    min-width: 0; min-height: 38px; border: 1px solid transparent;
+    border-radius: 8px; background: var(--card2); color: var(--text);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .calendar-day:disabled { cursor: default; opacity: .25; }
+  .calendar-day.done { background: linear-gradient(135deg, #00d2a0, #00b088); color: #06251c; font-weight: 700; }
+  .calendar-day.today { border-color: var(--accent); }
+  .calendar-day .mark { font-size: 10px; line-height: 1; }
+  .calendar-legend { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .year-calendar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .mini-month { min-width: 0; }
+  .mini-month-title { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .mini-month .calendar-grid { gap: 3px; }
+  .mini-month .calendar-weekday { font-size: 9px; padding: 2px 0; }
+  .mini-month .calendar-day { min-height: 24px; border-radius: 4px; font-size: 10px; }
+  .mini-month .calendar-day .mark { display: none; }
+  @media (max-width: 480px) {
+    .calendar-day { min-height: 32px; }
+    .year-calendar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .calendar-panel { padding: 12px; }
+  }
+
 </style>
 </head>
 <body>
@@ -275,6 +322,23 @@
     <button id="addBtn" title="Добавить">+</button>
   </div>
 
+
+  <section class="calendar-panel" aria-label="Календарь привычек">
+    <div class="calendar-heading">
+      <strong>📅 История выполнения</strong>
+      <div class="calendar-controls">
+        <button type="button" id="periodPrev" aria-label="Предыдущий период">‹</button>
+        <span class="calendar-title" id="periodTitle"></span>
+        <button type="button" id="periodNext" aria-label="Следующий период">›</button>
+        <select id="periodMode" aria-label="Период календаря">
+          <option value="month">Месяц</option>
+          <option value="year">Год</option>
+        </select>
+      </div>
+    </div>
+    <div id="calendarContent"></div>
+    <div class="calendar-legend">Нажми на день, чтобы отметить или снять отметку. Серым показаны дни вне выбранного периода или будущие даты.</div>
+  </section>
   <div id="habitsList"></div>
 </div>
 
@@ -285,6 +349,12 @@
 const STORAGE_KEY = 'habit-tracker-v1';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BAR_LENGTH = 7; // сколько дней показывать в полоске
+const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+let calendarDate = new Date();
+calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
+let calendarMode = 'month';
 
 let habits = load();
 
@@ -382,10 +452,83 @@ function bestStreak(habit) {
   return best;
 }
 
+
+/* ===================== КАЛЕНДАРЬ ===================== */
+function renderCalendar() {
+  const title = document.getElementById('periodTitle');
+  const content = document.getElementById('calendarContent');
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+
+  title.textContent = calendarMode === 'month'
+    ? `${MONTH_NAMES[month]} ${year}`
+    : String(year);
+
+  if (!habits.length) {
+    content.innerHTML = '<div class="empty" style="padding:20px">Добавь привычку, чтобы вести календарь выполнения.</div>';
+    return;
+  }
+
+  content.innerHTML = habits.map(habit => {
+    const heading = `<div style="font-weight:600;margin:12px 0 8px">${escapeHtml(habit.name)}</div>`;
+    if (calendarMode === 'month') {
+      return heading + renderMonthGrid(habit, year, month, false);
+    }
+    let months = '<div class="year-calendar">';
+    for (let m = 0; m < 12; m++) {
+      months += `<div class="mini-month"><div class="mini-month-title">${MONTH_NAMES[m]}</div>${renderMonthGrid(habit, year, m, true)}</div>`;
+    }
+    return heading + months + '</div>';
+  }).join('');
+
+  content.querySelectorAll('.calendar-day[data-date]').forEach(button => {
+    button.addEventListener('click', () => {
+      const key = button.dataset.date;
+      const habitId = button.dataset.habit;
+      if (key && habitId) toggleHabit(habitId, key);
+    });
+  });
+}
+
+function renderMonthGrid(habit, year, month, compact) {
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = todayKey();
+  let html = '<div class="calendar-grid">';
+  html += WEEKDAYS.map(day => `<div class="calendar-weekday">${day}</div>`).join('');
+  for (let i = 0; i < firstWeekday; i++) html += '<div></div>';
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const key = dateKey(date);
+    const isDone = habit.completed.includes(key);
+    const isToday = key === today;
+    const isFuture = key > today;
+    const classes = ['calendar-day', isDone ? 'done' : '', isToday ? 'today' : ''].filter(Boolean).join(' ');
+    const mark = isDone ? '<span class="mark">✓</span>' : '<span class="mark">&nbsp;</span>';
+    html += `<button type="button" class="${classes}" data-date="${key}" data-habit="${habit.id}"
+      title="${key}${isDone ? ' — выполнено' : ''}" aria-pressed="${isDone}" ${isFuture ? 'disabled' : ''}>
+      <span>${day}</span>${compact ? '' : mark}</button>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function changeCalendarPeriod(direction) {
+  if (calendarMode === 'month') {
+    calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + direction, 1);
+  } else {
+    calendarDate = new Date(calendarDate.getFullYear() + direction, calendarDate.getMonth(), 1);
+  }
+  renderCalendar();
+}
+
+
 /* ===================== РЕНДЕР ===================== */
 function render() {
   const list = document.getElementById('habitsList');
   list.innerHTML = '';
+  renderCalendar();
 
   if (!habits.length) {
     list.innerHTML = `<div class="empty"><span class="big">🌱</span>Пока нет привычек.<br>Добавь первую и начни свой путь!</div>`;
@@ -531,6 +674,12 @@ function toast(msg) {
 
 /* ===================== ИНИЦИАЛИЗАЦИЯ ===================== */
 document.getElementById('addBtn').addEventListener('click', addHabit);
+document.getElementById('periodPrev').addEventListener('click', () => changeCalendarPeriod(-1));
+document.getElementById('periodNext').addEventListener('click', () => changeCalendarPeriod(1));
+document.getElementById('periodMode').addEventListener('change', event => {
+  calendarMode = event.target.value;
+  renderCalendar();
+});
 document.getElementById('habitInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') addHabit();
 });
