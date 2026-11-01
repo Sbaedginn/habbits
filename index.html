@@ -497,6 +497,35 @@
       <button id="addBtn" title="Добавить">+</button>
     </div>
 
+  <!-- МОДАЛЬНОЕ ОКНО -->
+
+  <div
+    class="modal-overlay"
+    id="habitModal"
+    aria-hidden="true"
+  >
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalHabitName"
+    >
+
+      <div class="modal-header">
+
+        <div class="modal-heading">
+          <h2 id="modalHabitName">Название привычки</h2>
+          <p>История выполнения</p>
+        </div>
+
+        <button
+          type="button"
+          class="modal-close"
+          id="modalClose"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
 
     <div id="habitsList"></div>
     <section class="calendar-panel" aria-label="Календарь привычек">
@@ -752,12 +781,355 @@
           <div class="habit-streak-label">
             ${streak > 0 ? `🔥 Серия: ${streak} ${pluralDays(streak)}` : 'Начни серию сегодня!'}
           </div>
-        </div>
-      </div>
-      <button class="delete-btn" data-action="delete" title="Удалить">🗑</button>
-    </div>
+        `;
 
-    <div class="streak-bar">${cells.join('')}</div>
+        return;
+      }
+
+      habits.forEach(habit => {
+        list.appendChild(renderHabit(habit));
+      });
+    }
+
+    function renderHabit(habit) {
+      const el = document.createElement("div");
+
+      const doneToday = habit.completed.includes(todayKey());
+
+      el.className =
+        "habit" + (doneToday ? " done-today" : "");
+
+      const streak = currentStreak(habit);
+      const best = bestStreak(habit);
+      const total = new Set(habit.completed).size;
+
+      const cells = [];
+
+      for (let i = BAR_LENGTH - 1; i >= 0; i--) {
+        const key = shiftKey(-i);
+        const isDone = habit.completed.includes(key);
+        const isToday = i === 0;
+
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+
+        cells.push(`
+          <button
+            type="button"
+            class="day-cell ${isDone ? "done" : ""} ${isToday ? "today" : ""}"
+            data-date="${key}"
+            title="Отметить ${key}"
+            aria-pressed="${isDone}"
+          >
+            <span class="day-num">${d.getDate()}</span>
+            <span>${isDone ? "✓" : ""}</span>
+          </button>
+        `);
+      }
+
+      el.innerHTML = `
+        <div class="habit-top">
+
+          <div class="habit-info">
+
+            <button
+              class="check-btn ${doneToday ? "checked" : ""}"
+              data-action="toggle"
+              type="button"
+              aria-label="Отметить выполнение за сегодня"
+              aria-pressed="${doneToday}"
+            >
+              ✓
+            </button>
+
+            <div style="min-width:0">
+
+              <div class="habit-name">
+                ${escapeHtml(habit.name)}
+              </div>
+
+              <div class="habit-streak-label">
+                ${
+                  streak > 0
+                    ? `🔥 Серия: ${streak} ${pluralDays(streak)}`
+                    : "Начни серию сегодня!"
+                }
+              </div>
+
+            </div>
+
+          </div>
+
+          <div class="habit-actions">
+
+            <button
+              class="details-btn"
+              data-action="details"
+              type="button"
+            >
+              Подробнее
+            </button>
+
+            <button
+              class="delete-btn"
+              data-action="delete"
+              type="button"
+              title="Удалить"
+              aria-label="Удалить привычку"
+            >
+              🗑
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="streak-bar">
+          ${cells.join("")}
+        </div>
+
+        <div class="streak-summary">
+          <span>🔥 Текущая: <b>${streak}</b></span>
+          <span>🏆 Лучшая: <b>${best}</b></span>
+          <span>📅 Всего: <b>${total}</b></span>
+        </div>
+      `;
+
+      // Отметка сегодня
+
+      el.querySelector(
+        '[data-action="toggle"]'
+      ).addEventListener("click", () => {
+        toggleHabit(habit.id);
+      });
+
+      // Отметки последних семи дней
+
+      el.querySelectorAll(".day-cell").forEach(cell => {
+        cell.addEventListener("click", () => {
+          toggleHabit(habit.id, cell.dataset.date);
+        });
+      });
+
+      // Удаление
+
+      el.querySelector(
+        '[data-action="delete"]'
+      ).addEventListener("click", () => {
+        deleteHabit(habit.id);
+      });
+
+      // Подробнее
+
+      el.querySelector(
+        '[data-action="details"]'
+      ).addEventListener("click", () => {
+        openHabitCalendar(habit.id);
+      });
+
+      return el;
+    }
+
+    /* ===================== БЕЗОПАСНЫЙ ВЫВОД ===================== */
+
+    function escapeHtml(s) {
+      return String(s).replace(
+        /[&<>"']/g,
+        c => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;"
+        })[c]
+      );
+    }
+
+    /* ===================== ДЕЙСТВИЯ ===================== */
+
+    function addHabit() {
+      const input = document.getElementById("habitInput");
+      const name = input.value.trim();
+
+      if (!name) {
+        input.focus();
+        return;
+      }
+
+      habits.push({
+        id: uid(),
+        name,
+        completed: []
+      });
+
+      input.value = "";
+
+      save();
+      render();
+      showMotivation();
+
+      toast("Привычка добавлена! Погнали 🚀");
+
+      input.focus();
+    }
+
+    function toggleHabit(id, key = todayKey()) {
+      const habit = habits.find(h => h.id === id);
+
+      if (!habit) return;
+
+      // За будущие даты отмечать нельзя
+
+      if (key > todayKey()) return;
+
+      const idx = habit.completed.indexOf(key);
+
+      if (idx === -1) {
+        habit.completed.push(key);
+
+        toast(
+          key === todayKey()
+            ? "Отмечено за сегодня!"
+            : `Отмечено: ${key}`
+        );
+
+      } else {
+        habit.completed.splice(idx, 1);
+        toast("Отметка снята");
+      }
+
+      save();
+      render();
+    }
+
+    function deleteHabit(id) {
+      const habit = habits.find(h => h.id === id);
+
+      if (!habit) return;
+
+      if (!confirm(`Удалить «${habit.name}»?`)) {
+        return;
+      }
+
+      habits = habits.filter(h => h.id !== id);
+
+      save();
+      render();
+
+      toast("Привычка удалена");
+    }
+
+    /* ===================== МОТИВАЦИЯ ===================== */
+
+    function showMotivation() {
+      const q = QUOTES[
+        Math.floor(Math.random() * QUOTES.length)
+      ];
+
+      const box = document.getElementById("motivation");
+
+      box.querySelector(".emoji").textContent = q.emoji;
+
+      document.getElementById(
+        "quoteText"
+      ).textContent = q.text;
+
+      box.style.animation = "none";
+
+      void box.offsetWidth;
+
+      box.style.animation = "fadeIn .5s ease";
+    }
+
+    /* ===================== TOAST ===================== */
+
+    let toastTimer;
+
+    function toast(msg) {
+      const t = document.getElementById("toast");
+
+      t.textContent = msg;
+      t.classList.add("show");
+
+      clearTimeout(toastTimer);
+
+      toastTimer = setTimeout(() => {
+        t.classList.remove("show");
+      }, 2400);
+    }
+
+    /* ===================== ИНИЦИАЛИЗАЦИЯ ===================== */
+
+    document
+      .getElementById("addBtn")
+      .addEventListener("click", addHabit);
+
+    document
+      .getElementById("habitInput")
+      .addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          addHabit();
+        }
+      });
+
+    // Предыдущий период
+
+    document
+      .getElementById("periodPrev")
+      .addEventListener("click", () => {
+        changeCalendarPeriod(-1);
+      });
+
+    // Следующий период
+
+    document
+      .getElementById("periodNext")
+      .addEventListener("click", () => {
+        changeCalendarPeriod(1);
+      });
+
+    // Закрытие крестиком
+
+    document
+      .getElementById("modalClose")
+      .addEventListener("click", closeHabitCalendar);
+
+    // Закрытие кликом за пределами окна
+
+    modal.addEventListener("click", event => {
+      if (event.target === modal) {
+        closeHabitCalendar();
+      }
+    });
+
+    // Закрытие клавишей Escape
+
+    document.addEventListener("keydown", event => {
+      if (
+        event.key === "Escape" &&
+        selectedHabitId !== null
+      ) {
+        closeHabitCalendar();
+      }
+    });
+
+    /* ===================== СМЕНА ДНЯ ===================== */
+
+    let lastDay = todayKey();
+
+    setInterval(() => {
+      const now = todayKey();
+
+      if (now !== lastDay) {
+        lastDay = now;
+
+        render();
+
+        toast("🌅 Новый день — новые возможности!");
+      }
+    }, 60000);
+
+    /* ===================== ЗАПУСК ===================== */
 
     <div class="streak-summary">
       <span>🔥 Текущая: <b>${streak}</b></span>
